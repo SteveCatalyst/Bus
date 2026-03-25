@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>York Bus Times</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Unbounded:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f5f0e8;
+    --surface: #ffffff;
+    --surface2: #ede8e0;
+    --border: #d4cdc2;
+    --ink: #1a1612;
+    --muted: #8a8278;
+    --accent: #c0392b;
+    --accent2: #2980b9;
+    --yellow: #e67e22;
+    --radius: 4px;
+  }
+  html, body { height: 100%; background: var(--bg); color: var(--ink); font-family: 'DM Mono', monospace; }
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 999;
+  }
+  .app { max-width: 680px; margin: 0 auto; padding: 2rem 1.5rem 4rem; min-height: 100vh; }
+
+  .header { border-bottom: 3px solid var(--ink); padding-bottom: 1rem; margin-bottom: 2rem; }
+  .header-top { display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+  .logo { font-family: 'Unbounded', sans-serif; font-size: 1.6rem; font-weight: 900; letter-spacing: -0.03em; line-height: 1; }
+  .logo span { color: var(--accent); }
+  .tagline { font-size: 0.68rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+  .header-meta { margin-top: 0.5rem; display: flex; align-items: center; gap: 1.5rem; font-size: 0.72rem; color: var(--muted); }
+  .clock { font-weight: 500; color: var(--ink); font-size: 0.8rem; }
+
+  .location-bar {
+    background: var(--ink); color: var(--bg); padding: 0.8rem 1rem; border-radius: var(--radius);
+    margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem; font-size: 0.78rem;
+  }
+  .loc-text { flex: 1; }
+  .loc-text strong { display: block; font-weight: 500; font-size: 0.84rem; }
+  .loc-text small { opacity: 0.55; font-size: 0.66rem; }
+  .btn-locate {
+    background: var(--accent); color: white; border: none; padding: 0.4rem 0.85rem;
+    border-radius: 2px; font-family: 'DM Mono', monospace; font-size: 0.7rem; cursor: pointer;
+    transition: opacity 0.15s; white-space: nowrap; flex-shrink: 0;
+  }
+  .btn-locate:hover { opacity: 0.85; }
+  .btn-locate:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .section-label { font-size: 0.64rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.6rem; padding-left: 2px; }
+
+  .stops-list { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 2rem; }
+  .stop-card {
+    background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius);
+    overflow: hidden; transition: border-color 0.15s; animation: fadeUp 0.3s ease both;
+  }
+  .stop-card:hover { border-color: var(--ink); }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .stop-header {
+    display: flex; align-items: center; gap: 0.75rem; padding: 0.7rem 1rem;
+    background: var(--surface2); border-bottom: 1.5px solid var(--border);
+  }
+  .stop-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent2); flex-shrink: 0; }
+  .stop-name { font-family: 'Unbounded', sans-serif; font-size: 0.72rem; font-weight: 700; flex: 1; }
+  .stop-badge {
+    font-size: 0.62rem; color: var(--muted); background: var(--bg);
+    padding: 0.18rem 0.45rem; border-radius: 2px; border: 1px solid var(--border);
+  }
+
+  .departures { padding: 0 1rem 0.5rem; }
+  .dep-row {
+    display: grid; grid-template-columns: 2.6rem 1fr auto auto;
+    gap: 0.5rem; align-items: center; padding: 0.52rem 0;
+    border-bottom: 1px solid var(--surface2); font-size: 0.77rem; animation: fadeUp 0.2s ease both;
+  }
+  .dep-row:last-child { border-bottom: none; }
+  .dep-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--ink); color: var(--bg);
+    font-family: 'Unbounded', sans-serif; font-size: 0.58rem; font-weight: 700;
+    border-radius: 2px; padding: 0.22rem 0.3rem; text-align: center;
+  }
+  .dep-dest { font-size: 0.74rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dep-time { font-weight: 500; font-size: 0.74rem; text-align: right; }
+  .dep-wait { font-size: 0.67rem; color: var(--muted); text-align: right; white-space: nowrap; }
+  .dep-wait.due { color: var(--accent); font-weight: 500; }
+  .dep-wait.soon { color: var(--yellow); }
+  .no-deps { padding: 0.75rem 0; font-size: 0.72rem; color: var(--muted); font-style: italic; }
+
+  .state { text-align: center; padding: 3rem 1rem; color: var(--muted); }
+  .state-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+  .state h2 { font-family: 'Unbounded', sans-serif; font-size: 0.88rem; margin-bottom: 0.4rem; color: var(--ink); }
+  .state p { font-size: 0.72rem; line-height: 1.65; max-width: 300px; margin: 0 auto 1.2rem; }
+  .btn-primary {
+    background: var(--ink); color: var(--bg); border: none; padding: 0.65rem 1.4rem;
+    border-radius: var(--radius); font-family: 'DM Mono', monospace; font-size: 0.78rem; cursor: pointer; transition: opacity 0.15s;
+  }
+  .btn-primary:hover { opacity: 0.8; }
+
+  .refresh-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
+  .btn-sm {
+    background: none; border: 1.5px solid var(--border); color: var(--ink);
+    padding: 0.32rem 0.7rem; border-radius: 2px; font-family: 'DM Mono', monospace;
+    font-size: 0.67rem; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 0.35rem;
+  }
+  .btn-sm:hover { border-color: var(--ink); background: var(--surface2); }
+  .spin { display: inline-block; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .last-updated { font-size: 0.64rem; color: var(--muted); }
+
+  .notice {
+    margin-top: 1.5rem; padding: 0.85rem 1rem; border: 1.5px dashed var(--border);
+    border-radius: var(--radius); font-size: 0.68rem; color: var(--muted); line-height: 1.7;
+  }
+  .notice strong { color: var(--ink); }
+  .notice a { color: var(--accent2); }
+  .notice code { background: var(--surface2); padding: 0.1rem 0.3rem; border-radius: 2px; font-size: 0.65rem; }
+
+  .mock-tag {
+    display: inline-block; background: var(--yellow); color: white; font-size: 0.55rem;
+    padding: 0.1rem 0.35rem; border-radius: 2px; vertical-align: middle; margin-left: 0.4rem;
+    font-family: 'Unbounded', sans-serif; font-weight: 700; letter-spacing: 0.05em;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="header-top">
+      <div class="logo">BUS<span>●</span>YORK</div>
+      <div class="tagline">Live departures near you</div>
+    </div>
+    <div class="header-meta">
+      <span>York, UK</span>
+      <span class="clock" id="clock">--:--:--</span>
+    </div>
+  </div>
+
+  <div class="location-bar">
+    <span>📍</span>
+    <div class="loc-text">
+      <strong id="loc-label">Woodthorpe, York</strong>
+      <small id="loc-sub">Click "Locate me" for your exact position</small>
+    </div>
+    <button class="btn-locate" id="btn-locate" onclick="getLocation()">Locate me</button>
+  </div>
+
+  <div id="main-content">
+    <div class="state">
+      <div class="state-icon"><span class="spin">⟳</span></div>
+      <h2>Finding stops…</h2>
+    </div>
+  </div>
+</div>
+
+<script>
+// Default centre: Woodthorpe, York
+const DEFAULT_LAT = 53.9720, DEFAULT_LON = -1.0540;
+let userLat = DEFAULT_LAT, userLon = DEFAULT_LON, lastUpdated = null;
+
+// ── CLOCK ──────────────────────────────────────────────────────────────────
+function tick() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+setInterval(tick, 1000); tick();
+
+// ── GEOLOCATION ────────────────────────────────────────────────────────────
+function getLocation() {
+  const btn = document.getElementById('btn-locate');
+  btn.disabled = true; btn.textContent = 'Finding…';
+  if (!navigator.geolocation) { btn.disabled = false; btn.textContent = 'Locate me'; return; }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      userLat = pos.coords.latitude; userLon = pos.coords.longitude;
+      document.getElementById('loc-label').textContent = `${userLat.toFixed(5)}, ${userLon.toFixed(5)}`;
+      document.getElementById('loc-sub').textContent = `Accuracy ±${Math.round(pos.coords.accuracy)}m`;
+      btn.textContent = 'Refresh'; btn.disabled = false;
+      fetchStops();
+    },
+    () => {
+      // Permission denied — stay on default Woodthorpe location
+      document.getElementById('loc-label').textContent = 'Woodthorpe, York (default)';
+      document.getElementById('loc-sub').textContent = 'Location access denied — using default area';
+      btn.textContent = 'Retry'; btn.disabled = false;
+    },
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
+  );
+}
+
+// ── FETCH STOPS via OpenStreetMap Overpass ─────────────────────────────────
+async function fetchStops() {
+  showLoading('Searching for bus stops nearby…');
+  try {
+    const q = `[out:json][timeout:15];node["highway"="bus_stop"](around:700,${userLat},${userLon});out body 10;`;
+    const r = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`);
+    if (!r.ok) throw new Error('Overpass error');
+    const d = await r.json();
+    if (!d.elements?.length) { showErr('No bus stops found within 700m.'); return; }
+    const stops = d.elements.map(el => ({
+      id: el.id,
+      name: el.tags?.['naptan:CommonName'] || el.tags?.name || 'Bus Stop',
+      atco: el.tags?.['naptan:AtcoCode'] || null,
+      lat: el.lat, lon: el.lon,
+      dist: haversine(userLat, userLon, el.lat, el.lon)
+    })).sort((a, b) => a.dist - b.dist).slice(0, 6);
+    renderStops(stops);
+    await fetchAllDepartures(stops);
+  } catch(e) {
+    console.error(e);
+    showErr('Could not load nearby stops. Check your connection and try again.');
+  }
+}
+
+// ── FETCH DEPARTURES via our Netlify proxy ─────────────────────────────────
+async function fetchAllDepartures(stops) {
+  lastUpdated = new Date();
+  let anyReal = false;
+
+  for (const stop of stops) {
+    if (!stop.atco) { renderDeps(stop.id, [], false); continue; }
+    try {
+      const res = await fetch(`/api/departures?atco=${encodeURIComponent(stop.atco)}`);
+      if (res.status === 500) {
+        // API key not configured — show demo data
+        renderDeps(stop.atco, generateMock(), true);
+      } else if (!res.ok) {
+        renderDeps(stop.atco, [], false);
+      } else {
+        const xml = await res.text();
+        const deps = parseSiri(xml);
+        renderDeps(stop.atco, deps, false);
+        anyReal = true;
+      }
+    } catch {
+      renderDeps(stop.atco || stop.id, generateMock(), true);
+    }
+  }
+
+  const lu = document.getElementById('last-updated-text');
+  if (lu) lu.textContent = `Updated ${lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+
+  if (!anyReal) showNotice();
+}
+
+// ── PARSE SIRI XML ─────────────────────────────────────────────────────────
+function parseSiri(xml) {
+  const doc = new DOMParser().parseFromString(xml, 'text/xml');
+  return Array.from(doc.querySelectorAll('MonitoredStopVisit')).slice(0, 8).map(v => ({
+    line: v.querySelector('PublishedLineName')?.textContent || '?',
+    dest: v.querySelector('DestinationName')?.textContent || '—',
+    aimed: v.querySelector('AimedDepartureTime')?.textContent,
+    expected: v.querySelector('ExpectedDepartureTime')?.textContent,
+  }));
+}
+
+// ── MOCK DATA ──────────────────────────────────────────────────────────────
+const ROUTES = [
+  {line:'4', dest:'City Centre'}, {line:'4', dest:'Tang Hall'},
+  {line:'5', dest:'Heslington East'}, {line:'5', dest:'York Centre'},
+  {line:'10', dest:'Huntington'}, {line:'10', dest:'Rail Station'},
+  {line:'12', dest:'Dunnington'}, {line:'15', dest:'Acomb'},
+  {line:'22', dest:'Poppleton'}, {line:'1', dest:'Rawcliffe'},
+];
+function generateMock() {
+  const now = new Date(); let offset = Math.floor(Math.random() * 5);
+  return Array.from({ length: 5 }, () => {
+    offset += Math.floor(Math.random() * 10) + 2;
+    const t = new Date(now.getTime() + offset * 60000);
+    const r = ROUTES[Math.floor(Math.random() * ROUTES.length)];
+    return { ...r, aimed: t.toISOString(), expected: t.toISOString() };
+  });
+}
+
+// ── RENDER STOPS ───────────────────────────────────────────────────────────
+function renderStops(stops) {
+  document.getElementById('main-content').innerHTML = `
+    <div class="refresh-bar">
+      <span class="last-updated" id="last-updated-text">Loading…</span>
+      <button class="btn-sm" onclick="fetchStops()">↻ Refresh</button>
+    </div>
+    <div class="section-label">${stops.length} stop${stops.length > 1 ? 's' : ''} found nearby</div>
+    <div class="stops-list" id="stops-list"></div>
+    <div id="notice-slot"></div>
+  `;
+  const list = document.getElementById('stops-list');
+  stops.forEach((s, i) => {
+    const key = s.atco || s.id;
+    const card = document.createElement('div');
+    card.className = 'stop-card';
+    card.style.animationDelay = `${i * 0.07}s`;
+    card.innerHTML = `
+      <div class="stop-header">
+        <div class="stop-dot"></div>
+        <div class="stop-name">${esc(s.name)}</div>
+        <span class="stop-badge">${s.dist < 1000 ? Math.round(s.dist) + 'm' : (s.dist / 1000).toFixed(1) + 'km'}</span>
+        ${s.atco ? `<span class="stop-badge" style="color:var(--muted)">${esc(s.atco)}</span>` : ''}
+      </div>
+      <div class="departures" id="dep-${key}"><div class="no-deps">Loading…</div></div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+// ── RENDER DEPARTURES ──────────────────────────────────────────────────────
+function renderDeps(key, deps, isMock) {
+  const el = document.getElementById(`dep-${key}`); if (!el) return;
+  if (!deps.length) { el.innerHTML = '<div class="no-deps">No departures found in the next hour.</div>'; return; }
+  const now = new Date();
+  el.innerHTML = deps.map((d, i) => {
+    const t = new Date(d.expected || d.aimed);
+    const mins = Math.round((t - now) / 60000);
+    const timeStr = t.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const waitClass = mins <= 1 ? 'due' : mins <= 5 ? 'soon' : '';
+    const waitStr = mins <= 1 ? 'DUE' : `${mins} min`;
+    return `<div class="dep-row" style="animation-delay:${i * 0.04}s">
+      <div class="dep-num">${esc(d.line)}</div>
+      <div class="dep-dest">${esc(d.dest)}${isMock ? '<span class="mock-tag">DEMO</span>' : ''}</div>
+      <div class="dep-time">${timeStr}</div>
+      <div class="dep-wait ${waitClass}">${waitStr}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── NOTICE (no API key yet) ────────────────────────────────────────────────
+function showNotice() {
+  const slot = document.getElementById('notice-slot'); if (!slot) return;
+  slot.innerHTML = `<div class="notice">
+    <strong>Demo mode</strong> — times above are illustrative.<br>
+    To enable real live departures, add your <code>BODS_API_KEY</code> in the
+    <a href="https://app.netlify.com" target="_blank">Netlify dashboard</a> under
+    Site configuration → Environment variables.
+    Get a free key at <a href="https://data.bus-data.dft.gov.uk/" target="_blank">data.bus-data.dft.gov.uk</a>.
+  </div>`;
+}
+
+// ── UTILITY ────────────────────────────────────────────────────────────────
+function showLoading(msg) {
+  document.getElementById('main-content').innerHTML = `<div class="state">
+    <div class="state-icon"><span class="spin">⟳</span></div>
+    <h2>${esc(msg)}</h2></div>`;
+}
+function showErr(msg) {
+  document.getElementById('main-content').innerHTML = `<div class="state">
+    <div class="state-icon">⚠️</div><h2>Something went wrong</h2>
+    <p>${esc(msg)}</p>
+    <button class="btn-primary" onclick="fetchStops()">Try again</button></div>`;
+}
+function haversine(la1, lo1, la2, lo2) {
+  const R = 6371000, dL = (la2 - la1) * Math.PI / 180, dO = (lo2 - lo1) * Math.PI / 180;
+  const a = Math.sin(dL/2)**2 + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// Auto-refresh every 60s and load immediately
+setInterval(fetchStops, 60000);
+fetchStops();
+</script>
+</body>
+</html>
